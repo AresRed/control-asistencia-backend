@@ -18,4 +18,8 @@ public interface AttendanceRepository extends JpaRepository<AttendanceRecord, Lo
     List<AttendanceRecord> findByEmployeeAndDeviceTimestampBetween(Employee employee, LocalDateTime startDate,
             LocalDateTime endDate);
 
+    List<AttendanceRecord> findAllByEmployeeAndDeviceTimestampBetweenOrderByDeviceTimestampAsc(
+            Employee employee,
+            LocalDateTime startDate,
+            LocalDateTime endDate);
 }

@@ -63,18 +63,18 @@ public class DataLoader implements CommandLineRunner{
         // 1. Buscar el rol ADMIN
         Optional<Role> adminRoleOpt = roleRepository.findByName(ERole.ROLE_ADMIN);
 
-        if (adminRoleOpt.isPresent() && !userRepository.existsByUsername("admin")) {
+        if (adminRoleOpt.isPresent() && !userRepository.existsByUsername("Ares")) {
             
             User adminUser = new User();
-            adminUser.setUsername("admin");
+            adminUser.setUsername("Ares");
             
             
-            adminUser.setPassword(passwordEncoder.encode("admin123")); // Contraseña: admin123
+            adminUser.setPassword(passwordEncoder.encode("Ares123")); // Contraseña: admin123
             adminUser.setRole(adminRoleOpt.get());
 
             
             userRepository.save(adminUser);
-            System.out.println("-> Usuario 'admin' creado con contraseña: admin123");
+            System.out.println("-> Usuario 'Ares' creado con contraseña: Ares123");
         }
     }
 

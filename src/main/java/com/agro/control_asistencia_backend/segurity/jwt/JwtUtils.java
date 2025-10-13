@@ -8,11 +8,15 @@ import org.slf4j.LoggerFactory;
 
 
 
+import java.util.List;
+import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import com.agro.control_asistencia_backend.segurity.service.UserDetailsImpl;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.MalformedJwtException;
@@ -38,10 +42,13 @@ public class JwtUtils {
         
         
         UserDetailsImpl userPrincipal = (UserDetailsImpl) authentication.getPrincipal();
+        List<String> roles = userPrincipal.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .collect(Collectors.toList());
 
         return Jwts.builder()
                 .setSubject((userPrincipal.getUsername())) 
-                .claim("roles", userPrincipal.getAuthorities().iterator().next().getAuthority()) 
+                .claim("roles", roles) 
                 .setIssuedAt(new Date()) 
                 .setExpiration(new Date((new Date()).getTime() + jwtExpirationMs)) 
                 .signWith(key(), SignatureAlgorithm.HS256) 

@@ -31,6 +31,10 @@ public class AuthController {
     @PostMapping("/login") // Endpoint: POST /api/auth/login
     public ResponseEntity<?> authenticateUser(@Valid @RequestBody LoginRequestDTO loginRequest) {
 
+        System.out.println("\n\n\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+        System.out.println("!!! INTENTO DE LOGIN RECIBIDO EN EL BACKEND !!!");
+        System.out.println("!!! Usuario: " + loginRequest.getUsername());
+        System.out.println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n\n\n");
      
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(loginRequest.getUsername(), loginRequest.getPassword()));
