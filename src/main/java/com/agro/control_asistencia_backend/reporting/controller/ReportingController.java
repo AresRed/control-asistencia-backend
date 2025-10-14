@@ -30,6 +30,7 @@ public class ReportingController {
     // Endpoint: GET
     // /api/reports/employee/{employeeId}?start=2024-01-01&end=2024-01-31
     // Permite a ADMIN y RRHH solicitar el reporte de un empleado.
+        
     @GetMapping("/employee/{employeeId}")
     @PreAuthorize("hasRole('ADMIN') or hasRole('RRHH')")
     public ResponseEntity<List<DailyWorkSummary>> getEmployeeReport(

@@ -30,16 +30,11 @@ public class SecurityConfig {
     private final UserDetailsServiceImpl userDetailsService;
     private final JwtAuthenticationFilter authenticationJwtTokenFilter;
 
-    // Inyección de dependencias por constructor (práctica profesional)
     public SecurityConfig(UserDetailsServiceImpl userDetailsService,
             JwtAuthenticationFilter authenticationJwtTokenFilter) {
         this.userDetailsService = userDetailsService;
         this.authenticationJwtTokenFilter = authenticationJwtTokenFilter;
     }
-
-    // ---------------------------------------------------------------------
-    // 1. GESTIÓN DE AUTENTICACIÓN Y CIFRADO
-    // ---------------------------------------------------------------------
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -63,10 +58,6 @@ public class SecurityConfig {
         return authConfig.getAuthenticationManager();
     }
 
-    // ---------------------------------------------------------------------
-    // 2. CONFIGURACIÓN GLOBAL DE CORS
-    // ---------------------------------------------------------------------
-
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
@@ -87,37 +78,37 @@ public class SecurityConfig {
         return source;
     }
 
-    // ---------------------------------------------------------------------
-    // 3. CADENA DE FILTROS Y REGLAS DE ACCESO
-  
     @Bean
-public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-    
-    http
-        // 1. Deshabilitar el formulario de login HTTP (ya que usamos API REST/JSON)
-        .formLogin(AbstractHttpConfigurer::disable)
-        
-        // 2. Deshabilitar la gestión básica HTTP (es lo que suele arrojar 403)
-        .httpBasic(AbstractHttpConfigurer::disable) 
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
 
-        .csrf(csrf -> csrf.disable())
-        .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-        
-        // Indicar que la API es STATELESS (sin estado)
-        .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-        
-        // 3. Configuración de Autorización
-        .authorizeHttpRequests(auth -> auth
-            // ... (Asegurar que esta línea sea perfecta)
-            
-            .requestMatchers("/api/auth/**").permitAll()
-            .requestMatchers("/api/attendance/**").hasAnyRole("ADMIN", "RRHH") 
-            .requestMatchers("/api/reports/**").hasAnyRole("ADMIN", "RRHH")
-            .anyRequest().authenticated()
-        );
-        
-    // 4. Agregar el filtro JWT (ya lo tienes correctamente)
-    http.addFilterBefore(authenticationJwtTokenFilter, UsernamePasswordAuthenticationFilter.class);
+        http
+                // 1. Deshabilitar el formulario de login HTTP (ya que usamos API REST/JSON)
+                .formLogin(AbstractHttpConfigurer::disable)
 
-    return http.build();}
+                // 2. Deshabilitar la gestión básica HTTP (es lo que suele arrojar 403)
+                .httpBasic(AbstractHttpConfigurer::disable)
+
+                .csrf(csrf -> csrf.disable())
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+
+                // Indicar que la API es STATELESS (sin estado)
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+
+                // 3. Configuración de Autorización
+                .authorizeHttpRequests(auth -> auth
+                        // ... (Asegurar que esta línea sea perfecta)
+
+                        .requestMatchers("/api/auth/**", "/api/attendance/**").permitAll() 
+                        .requestMatchers("/api/auth/logout").authenticated()
+                        .requestMatchers("/api/requests/**").authenticated()
+                        .requestMatchers("/api/schedules/**").hasAnyRole("ADMIN", "RRHH") 
+                        .requestMatchers("/api/employee/**", "/api/reports/**").hasAnyRole("ADMIN", "RRHH") 
+
+                        .anyRequest().authenticated());
+
+        // 4. Agregar el filtro JWT (ya lo tienes correctamente)
+        http.addFilterBefore(authenticationJwtTokenFilter, UsernamePasswordAuthenticationFilter.class);
+
+        return http.build();
+    }
 }

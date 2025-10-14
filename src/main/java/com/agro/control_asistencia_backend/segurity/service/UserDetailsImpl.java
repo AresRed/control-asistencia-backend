@@ -40,7 +40,8 @@ public class UserDetailsImpl implements UserDetails {
 
     public static UserDetailsImpl build(User user) {
 
-        // El enum ERole ya contiene el prefijo "ROLE_", por lo que lo usamos directamente.
+        // El enum ERole tiene valores como ROLE_ADMIN. Lo usamos directamente.
+        // El comentario anterior era incorrecto, el prefijo se estaba duplicando.
         SimpleGrantedAuthority authority = new SimpleGrantedAuthority(user.getRole().getName().name());
 
         return new UserDetailsImpl(

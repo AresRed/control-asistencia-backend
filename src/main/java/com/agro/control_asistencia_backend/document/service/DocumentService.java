@@ -1,0 +1,154 @@
+package com.agro.control_asistencia_backend.document.service;
+
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.UUID;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+
+import com.agro.control_asistencia_backend.document.model.dto.DocumentResponseDTO;
+import com.agro.control_asistencia_backend.document.model.entity.Document;
+import com.agro.control_asistencia_backend.document.model.entity.DocumentTemplate;
+import com.agro.control_asistencia_backend.document.repository.DocumentRepository;
+import com.agro.control_asistencia_backend.document.repository.DocumentTemplateRepository;
+import com.agro.control_asistencia_backend.employee.model.entity.Employee;
+import com.agro.control_asistencia_backend.employee.repository.EmployeeRepository;
+import com.agro.control_asistencia_backend.segurity.service.UserDetailsImpl;
+
+import jakarta.transaction.Transactional;
+
+@Service
+public class DocumentService {
+
+    // Ruta donde se guardarán los archivos (definida en application.properties)
+    @Value("${file.upload-dir}")
+    private String uploadDir;
+
+    private final DocumentRepository documentRepository;
+    private final EmployeeRepository employeeRepository;
+    private final DocumentTemplateRepository templateRepository;
+
+    public DocumentService(EmployeeRepository employeeRepository,
+            DocumentTemplateRepository templateRepository,
+            DocumentRepository documentRepository) {
+        this.employeeRepository = employeeRepository;
+        this.templateRepository = templateRepository; 
+        this.documentRepository = documentRepository;
+    }
+
+    // ---------------------------------------------------------------------
+    // Lógica para Subir Archivos (Upload)
+    // ---------------------------------------------------------------------
+
+    @Transactional
+    public DocumentResponseDTO uploadDocument(Long employeeId, String documentType,
+            MultipartFile file, UserDetailsImpl uploader) throws IOException {
+
+        // 1. Validar Empleado de destino
+        Employee employee = employeeRepository.findById(employeeId)
+                .orElseThrow(() -> new RuntimeException("Empleado no encontrado con ID: " + employeeId));
+
+        // 2. Definir la ruta de almacenamiento
+        // Generamos un nombre único para evitar colisiones
+        String uniqueFileName = UUID.randomUUID().toString() + "_" + file.getOriginalFilename();
+        Path copyLocation = Paths.get(uploadDir + File.separator + uniqueFileName);
+
+        // Aseguramos que el directorio exista
+        Files.createDirectories(copyLocation.getParent());
+
+        // 3. Guardar el archivo en el sistema de archivos (simulación)
+        Files.copy(file.getInputStream(), copyLocation);
+
+        // 4. Guardar Metadatos en la DB
+        Document document = new Document();
+        document.setEmployee(employee);
+        document.setFileName(file.getOriginalFilename());
+        document.setDocumentType(documentType);
+        document.setContentType(file.getContentType());
+        document.setStoragePath(copyLocation.toString()); // Guardamos la ruta física
+        document.setUploadedBy(uploader.getUsername());
+
+        Document savedDoc = documentRepository.save(document);
+
+        // 5. Devolver DTO de Respuesta
+        return mapToDocumentResponseDTO(savedDoc);
+    }
+
+    // ---------------------------------------------------------------------
+    // Lógica para Descargar Archivos (Download)
+    // ---------------------------------------------------------------------
+
+    public Document getDocumentById(Long documentId) {
+        return documentRepository.findById(documentId)
+                .orElseThrow(() -> new RuntimeException("Documento no encontrado con ID: " + documentId));
+    }
+
+    // ... (Aquí iría la lógica para leer el archivo binario y enviarlo de vuelta)
+
+    // ---------------------------------------------------------------------
+    // Auxiliares
+    // ---------------------------------------------------------------------
+    private DocumentResponseDTO mapToDocumentResponseDTO(Document doc) {
+        return DocumentResponseDTO.builder()
+                .id(doc.getId())
+                .fileName(doc.getFileName())
+                .documentType(doc.getDocumentType())
+                .employeeCode(doc.getEmployee().getEmployeeCode())
+                .uploadDate(doc.getUploadDate())
+                .downloadUrl("/api/documents/" + doc.getId() + "/download") // URL para descargar
+                .build();
+    }
+
+    @Transactional
+    public DocumentResponseDTO generateDocument(Long employeeId, Long templateId, UserDetailsImpl user)
+            throws IOException {
+
+        // 1. Obtener Empleado y Plantilla
+        Employee employee = employeeRepository.findById(employeeId)
+                .orElseThrow(() -> new RuntimeException("Empleado no encontrado."));
+
+        DocumentTemplate template = templateRepository.findById(templateId)
+                .orElseThrow(() -> new RuntimeException("Plantilla no encontrada."));
+
+        // 2. Definir la lógica de reemplazo de contenido (Simulación de la generación)
+        String content = "DOCUMENTO GENERADO A PARTIR DE PLANTILLA: " + template.getName() + "\n\n";
+        content += "A quien corresponda, se certifica que nuestro empleado:\n";
+        content += "Nombre: " + employee.getFirstName() + " " + employee.getLastName() + "\n";
+        content += "Código: " + employee.getEmployeeCode() + "\n";
+        content += "Cargo: " + employee.getPosition() + "\n";
+        content += "Fecha de generación: " + LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE);
+
+        // 3. Simular el guardado del archivo generado
+        String fileName = employee.getEmployeeCode() + "_" + template.getName().replaceAll("\\s+", "_") + "_"
+                + System.currentTimeMillis() + ".txt";
+        Path copyLocation = Paths.get(uploadDir + File.separator + fileName);
+
+        // Escribir el contenido al archivo de texto simulado
+        try (PrintWriter out = new PrintWriter(new FileWriter(copyLocation.toFile()))) {
+            out.print(content);
+        }
+
+        // 4. Guardar Metadatos en la DB (igual que en uploadDocument)
+        Document document = new Document();
+        document.setEmployee(employee);
+        document.setFileName(fileName);
+        document.setDocumentType(template.getName());
+        document.setContentType("text/plain"); // O el tipo de archivo real (application/pdf)
+        document.setStoragePath(copyLocation.toString());
+        document.setUploadedBy(user.getUsername());
+
+        Document savedDoc = documentRepository.save(document);
+
+        // 5. Devolver DTO de Respuesta
+        return mapToDocumentResponseDTO(savedDoc);
+    }
+}
