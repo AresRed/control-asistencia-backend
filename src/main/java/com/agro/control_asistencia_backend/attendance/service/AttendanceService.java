@@ -1,19 +1,24 @@
 package com.agro.control_asistencia_backend.attendance.service;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.agro.control_asistencia_backend.attendance.model.dto.AttendanceRequestDTO;
 import com.agro.control_asistencia_backend.attendance.model.dto.AttendanceResponseDTO;
 import com.agro.control_asistencia_backend.attendance.model.entity.AttendanceRecord;
 import com.agro.control_asistencia_backend.attendance.repository.AttendanceRepository;
+import com.agro.control_asistencia_backend.document.model.dto.EmployeeStatusDTO;
 import com.agro.control_asistencia_backend.employee.model.entity.Employee;
 import com.agro.control_asistencia_backend.employee.repository.EmployeeRepository;
 
-import jakarta.transaction.Transactional;
+
 
 @Service
 public class AttendanceService {
@@ -56,14 +61,14 @@ public class AttendanceService {
         AttendanceRecord savedRecord = attendanceRepository.save(newRecord);
 
         return AttendanceResponseDTO.builder()
-        .id(savedRecord.getId())
-        .employeeCode(employee.getEmployeeCode())
-        .recordType(savedRecord.getRecordType())
-        .deviceTimestamp(savedRecord.getDeviceTimestamp())
-        .syncTimestamp(savedRecord.getSyncTimestamp())
-        .latitude(savedRecord.getLatitude())
-        .longitude(savedRecord.getLongitude())
-        .build();
+                .id(savedRecord.getId())
+                .employeeCode(employee.getEmployeeCode())
+                .recordType(savedRecord.getRecordType())
+                .deviceTimestamp(savedRecord.getDeviceTimestamp())
+                .syncTimestamp(savedRecord.getSyncTimestamp())
+                .latitude(savedRecord.getLatitude())
+                .longitude(savedRecord.getLongitude())
+                .build();
     }
 
     private String determineRecordType(Employee employee) {
@@ -79,6 +84,51 @@ public class AttendanceService {
 
     private boolean isLocationValid(Double lat, Double lon) {
         return true;
+    }
+
+    public List<EmployeeStatusDTO> getDailyAttendanceStatus(LocalDate date) {
+        List<Employee> employees = employeeRepository.findAll();
+        LocalDate today = LocalDate.now();
+
+        return employees.stream().map(employee -> {
+            // Encuentra el último registro para determinar el estado
+            Optional<AttendanceRecord> lastRecord = attendanceRepository
+                    .findTopByEmployeeOrderByDeviceTimestampDesc(employee);
+
+            EmployeeStatusDTO dto = new EmployeeStatusDTO();
+            dto.setEmployeeId(employee.getId());
+            dto.setFullName(employee.getFirstName() + " " + employee.getLastName());
+            dto.setPosition(employee.getPosition());
+
+            dto.setReportDate(date);
+
+            if (lastRecord.isEmpty() || lastRecord.get().getDeviceTimestamp().toLocalDate().isBefore(date)) {
+                dto.setStatus("NO_REGISTRADO"); // No hay registros hoy
+                dto.setLastMarkTime(null);
+            } else {
+                String type = lastRecord.get().getRecordType(); // "IN" o "OUT"
+                dto.setLastMarkTime(lastRecord.get().getDeviceTimestamp().toLocalTime());
+
+                if ("IN".equals(type)) {
+                    dto.setStatus("ASISTIO"); // Entró pero no ha salido
+                } else {
+                    dto.setStatus("SALIO"); // Entró y ya salió
+                }
+            }
+            return dto;
+        }).collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<AttendanceRecord> getAttendanceByEmployeeCode(String employeeCode) {
+
+        // 1. Encontrar al empleado usando su código
+        Employee employee = employeeRepository.findByEmployeeCode(employeeCode)
+                .orElseThrow(() -> new RuntimeException("Empleado no encontrado para historial."));
+
+        // 2. Usar el repositorio para obtener todos los registros de asistencia de ese
+        // empleado
+        return attendanceRepository.findByEmployee(employee);
     }
 
 }

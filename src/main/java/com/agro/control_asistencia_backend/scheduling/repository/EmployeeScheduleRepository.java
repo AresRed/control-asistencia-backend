@@ -11,4 +11,6 @@ public interface EmployeeScheduleRepository extends JpaRepository<EmployeeSchedu
         Employee employee, LocalDate todayStart, LocalDate todayEnd
     );
 
+    Optional<EmployeeSchedule> findTopByEmployeeOrderByValidFromDesc(Employee employee); // <--- ¡AÑADE ESTO!
+
 }

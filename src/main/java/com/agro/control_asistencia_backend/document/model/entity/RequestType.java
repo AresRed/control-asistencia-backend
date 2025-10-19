@@ -1,5 +1,4 @@
 package com.agro.control_asistencia_backend.document.model.entity;
-
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;

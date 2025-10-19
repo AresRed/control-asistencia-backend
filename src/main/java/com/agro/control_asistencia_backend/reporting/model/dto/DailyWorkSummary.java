@@ -28,4 +28,8 @@ public class DailyWorkSummary {
     
     // Indica si el día tuvo un ciclo completo de IN y OUT
     private boolean isComplete; 
+
+    private Long overtimeMinutes;
+
+    private long regularMinutes;
 }

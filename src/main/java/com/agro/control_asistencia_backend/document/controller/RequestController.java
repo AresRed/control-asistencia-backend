@@ -2,6 +2,7 @@ package com.agro.control_asistencia_backend.document.controller;
 
 import java.util.List;
 
+import org.apache.catalina.connector.Request;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -33,7 +34,7 @@ import lombok.NoArgsConstructor;
 public class RequestController {
 
     private final RequestService requestService;
-    private final EmployeeRequestRepository requestRepository;
+    private final EmployeeRequestRepository requestRepository; // Mantenido para el método findAll()
 
     @Autowired
     public RequestController(RequestService requestService, EmployeeRequestRepository requestRepository) {
@@ -41,49 +42,76 @@ public class RequestController {
         this.requestRepository = requestRepository;
     }
 
-    /**
-     * Endpoint para que un empleado cree una nueva solicitud.
-     * Solo requiere que el usuario esté autenticado.
-     */
+    // -----------------------------------------------------------
+    // 1. ENDPOINT: CREAR SOLICITUD (EMPLEADO)
+    // POST /api/requests
+    // -----------------------------------------------------------
     @PostMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasRole('EMPLOYEE') or hasRole('ADMIN')") // El empleado es el que debe hacer esto
     public ResponseEntity<RequestResponseDTO> createEmployeeRequest(
             @Valid @RequestBody EmployeeRequestDTO requestDTO,
-            // Captura el ID del usuario autenticado directamente del token
             @AuthenticationPrincipal UserDetailsImpl userDetails) {
 
         Long userId = userDetails.getId();
 
+        // El servicio crea y devuelve el DTO de respuesta limpio
         RequestResponseDTO createdRequest = requestService.createRequest(requestDTO, userId);
 
-        return new ResponseEntity<RequestResponseDTO>(createdRequest, HttpStatus.CREATED);
+        return ResponseEntity.status(HttpStatus.CREATED).body(createdRequest);
     }
 
+    // -----------------------------------------------------------
+    // 2. ENDPOINT: VER TODAS LAS SOLICITUDES (ADMIN/RRHH)
+    // GET /api/requests
+    // -----------------------------------------------------------
     @GetMapping
     @PreAuthorize("hasRole('ADMIN') or hasRole('RRHH')")
-    public ResponseEntity<List<EmployeeRequest>> getAllRequests() {
-        // NOTA: Implementar findByStatus("PENDING") en el servicio y mapear a DTO List.
-        return ResponseEntity.ok(requestRepository.findAll());
+    public ResponseEntity<List<RequestResponseDTO>> getAllRequests() {
+        // Llama al servicio para obtener todas las solicitudes (PENDIENTES y otras)
+        List<RequestResponseDTO> allRequests = requestService.getAllRequests();
+        return ResponseEntity.ok(allRequests);
     }
 
+    // -----------------------------------------------------------
+    // 3. ENDPOINT: VER MIS SOLICITUDES (EMPLEADO)
+    // GET /api/requests/me
+    // -----------------------------------------------------------
+    @GetMapping("/me")
+    @PreAuthorize("isAuthenticated()") // Permite a cualquier usuario logueado (incluido EMPLOYEE) ver sus datos
+    public ResponseEntity<List<RequestResponseDTO>> getMyRequests(
+            @AuthenticationPrincipal UserDetailsImpl userDetails) {
 
-    @Data
-    @NoArgsConstructor 
-    static class StatusUpdateDTO {
-        private String status;
-        private String comment;
+        // El servicio debe buscar solo las solicitudes asociadas al ID de usuario
+        List<RequestResponseDTO> myRequests = requestService.getMyRequests(userDetails.getId());
+
+        return ResponseEntity.ok(myRequests);
     }
-
-    // Endpoint 2: Aprobar o Rechazar una solicitud
+    
+    // -----------------------------------------------------------
+    // 4. ENDPOINT: APROBAR/RECHAZAR SOLICITUD (ADMIN/RRHH)
+    // PUT /api/requests/{requestId}/status
+    // -----------------------------------------------------------
     @PutMapping("/{requestId}/status")
     @PreAuthorize("hasRole('ADMIN') or hasRole('RRHH')")
     public ResponseEntity<RequestResponseDTO> updateRequestStatus(
             @PathVariable Long requestId,
             @RequestBody StatusUpdateDTO statusDTO) {
 
+        // El servicio actualiza el estado y devuelve el DTO con los detalles
         RequestResponseDTO updatedRequest = requestService.updateRequestStatus(
                 requestId, statusDTO.getStatus(), statusDTO.getComment());
 
         return ResponseEntity.ok(updatedRequest);
+    }
+
+    // -----------------------------------------------------------
+    // CLASE INTERNA: DTO de Actualización de Estado (PUT Body)
+    // -----------------------------------------------------------
+    @Data
+    @NoArgsConstructor
+    // CRÍTICO: Debe ser 'static' para que Jackson pueda deserializarlo
+    static class StatusUpdateDTO { 
+        private String status;
+        private String comment;
     }
 }

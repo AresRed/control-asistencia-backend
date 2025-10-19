@@ -11,4 +11,7 @@ public interface EmployeeRequestRepository extends JpaRepository<EmployeeRequest
 
         List<EmployeeRequest> findByEmployee(Employee employee);
 
+        List<EmployeeRequest> findByEmployeeAndStatus(Employee employee, String status); 
+
+
 }

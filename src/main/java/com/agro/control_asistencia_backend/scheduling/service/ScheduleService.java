@@ -1,7 +1,13 @@
 package com.agro.control_asistencia_backend.scheduling.service;
 
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.util.Optional;
+
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.agro.control_asistencia_backend.employee.model.entity.Employee;
 import com.agro.control_asistencia_backend.employee.repository.EmployeeRepository;
@@ -13,7 +19,7 @@ import com.agro.control_asistencia_backend.scheduling.model.entity.WorkSchedule;
 import com.agro.control_asistencia_backend.scheduling.repository.EmployeeScheduleRepository;
 import com.agro.control_asistencia_backend.scheduling.repository.WorkScheduleRepository;
 
-import jakarta.transaction.Transactional;
+
 
 @Service
 public class ScheduleService {
@@ -23,9 +29,9 @@ public class ScheduleService {
     private final EmployeeRepository employeeRepository;
 
     @Autowired
-    public ScheduleService(WorkScheduleRepository workScheduleRepository, 
-                           EmployeeScheduleRepository employeeScheduleRepository, 
-                           EmployeeRepository employeeRepository) {
+    public ScheduleService(WorkScheduleRepository workScheduleRepository,
+            EmployeeScheduleRepository employeeScheduleRepository,
+            EmployeeRepository employeeRepository) {
         this.workScheduleRepository = workScheduleRepository;
         this.employeeScheduleRepository = employeeScheduleRepository;
         this.employeeRepository = employeeRepository;
@@ -42,48 +48,71 @@ public class ScheduleService {
         schedule.setStartTime(dto.getStartTime());
         schedule.setEndTime(dto.getEndTime());
         schedule.setToleranceMinutes(dto.getToleranceMinutes());
-        
+
         return workScheduleRepository.save(schedule);
     }
 
     // ---------------------------------------------------------------------
     // Lógica para asignar turnos a empleados (EmployeeSchedule)
     // ---------------------------------------------------------------------
-    
+
     @Transactional
     public ScheduleResponseDTO assignScheduleToEmployee(EmployeeScheduleAssignmentDTO dto) {
-        
+
         // 1. Validar existencia del Empleado
         Employee employee = employeeRepository.findById(dto.getEmployeeId())
                 .orElseThrow(() -> new RuntimeException("Empleado no encontrado con ID: " + dto.getEmployeeId()));
 
         // 2. Validar existencia del Turno
         WorkSchedule schedule = workScheduleRepository.findById(dto.getScheduleId())
-                .orElseThrow(() -> new RuntimeException("Turno de trabajo no encontrado con ID: " + dto.getScheduleId()));
-        
-        // 3. Crear Asignación
+                .orElseThrow(
+                        () -> new RuntimeException("Turno de trabajo no encontrado con ID: " + dto.getScheduleId()));
+
+
         EmployeeSchedule assignment = new EmployeeSchedule();
         assignment.setEmployee(employee);
         assignment.setWorkSchedule(schedule);
         assignment.setValidFrom(dto.getValidFrom());
         assignment.setValidTo(dto.getValidTo());
         assignment.setWorkingDays(dto.getWorkingDays());
-        
+
         EmployeeSchedule savedAssignment = employeeScheduleRepository.save(assignment);
 
-        // NOTA: En un sistema completo, aquí iría la lógica para verificar
-        // que no se solapen con otras asignaciones activas para el mismo empleado.
-
         return ScheduleResponseDTO.builder()
-            .assignmentId(savedAssignment.getId())
-            .employeeId(employee.getId())
-            .employeeCode(employee.getEmployeeCode())
-            .scheduleName(schedule.getName())
-            .startTime(schedule.getStartTime())
-            .endTime(schedule.getEndTime())
-            .validFrom(savedAssignment.getValidFrom())
-            .validTo(savedAssignment.getValidTo())
-            .workingDays(savedAssignment.getWorkingDays())
-            .build();
+                .assignmentId(savedAssignment.getId())
+                .employeeId(employee.getId())
+                .employeeCode(employee.getEmployeeCode())
+                .scheduleName(schedule.getName())
+                .startTime(schedule.getStartTime())
+                .endTime(schedule.getEndTime())
+                .validFrom(savedAssignment.getValidFrom())
+                .validTo(savedAssignment.getValidTo())
+                .workingDays(savedAssignment.getWorkingDays())
+                .build();
+    }
+
+    public Optional<EmployeeSchedule> getEmployeeScheduleByUserId(Long userId, LocalDate date) {
+
+        Employee employee = employeeRepository.findByUserId(userId)
+                .orElseThrow(() -> new RuntimeException("Empleado no encontrado."));
+
+        return employeeScheduleRepository.findTopByEmployeeOrderByValidFromDesc(employee);
+
+    }
+
+    @Transactional(readOnly = true)
+    public LocalTime getScheduledEndTime(Long employeeId, LocalDate date) {
+        
+        Employee employee = employeeRepository.findById(employeeId)
+                .orElseThrow(() -> new RuntimeException("Empleado no encontrado."));
+        
+        Optional<EmployeeSchedule> activeAssignment = employeeScheduleRepository.findTopByEmployeeOrderByValidFromDesc(employee);
+
+        if (activeAssignment.isPresent() && activeAssignment.get().getWorkSchedule() != null) {
+            
+            return activeAssignment.get().getWorkSchedule().getEndTime();
+        }
+
+        return LocalTime.of(17, 0); 
     }
 }

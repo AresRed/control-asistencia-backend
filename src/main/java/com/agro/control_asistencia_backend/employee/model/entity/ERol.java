@@ -1,7 +1,7 @@
 package com.agro.control_asistencia_backend.employee.model.entity;
 
-public enum ERole {
-  ROLE_USER,
-  ROLE_SUPERVISOR,
-  ROLE_ADMIN
+public enum ERol {
+    ROLE_ADMIN,
+    ROLE_RRHH,
+    ROLE_EMPLOYEE
 }

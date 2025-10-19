@@ -1,5 +1,7 @@
 package com.agro.control_asistencia_backend.employee.model.entity;
 
+import java.math.BigDecimal;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -47,5 +49,11 @@ public class Employee {
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", referencedColumnName = "id")
     private User user;
+
+    @Column(name = "fixed_salary")
+    private BigDecimal fixedSalary; // Sueldo fijo mensual
+
+    @Column(name = "hourly_rate")
+    private BigDecimal hourlyRate;
 
 }

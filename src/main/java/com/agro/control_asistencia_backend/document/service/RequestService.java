@@ -1,9 +1,12 @@
 package com.agro.control_asistencia_backend.document.service;
 
+import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional; // 
 
 import com.agro.control_asistencia_backend.document.model.dto.EmployeeRequestDTO;
 import com.agro.control_asistencia_backend.document.model.dto.RequestResponseDTO;
@@ -14,7 +17,7 @@ import com.agro.control_asistencia_backend.document.repository.RequestTypeReposi
 import com.agro.control_asistencia_backend.employee.model.entity.Employee;
 import com.agro.control_asistencia_backend.employee.repository.EmployeeRepository;
 
-import jakarta.transaction.Transactional;
+
 
 @Service
 public class RequestService {
@@ -127,15 +130,62 @@ public class RequestService {
     // Método auxiliar (debe ser implementado en tu servicio)
     private RequestResponseDTO mapToRequestResponseDTO(EmployeeRequest request) {
         // ... Lógica de mapeo a RequestResponseDTO (igual que en createRequest) ...
-        // Necesario para devolver JSON limpio y evitar errores de proxy.
+        Employee employee = request.getEmployee();
         return RequestResponseDTO.builder()
-                .id(request.getId())
-                .employeeId(request.getEmployee().getId())
-                .employeeName(request.getEmployee().getFirstName() + " " + request.getEmployee().getLastName())
-                .requestType(request.getRequestType().getName())
-                .status(request.getStatus())
-                // ... otros campos
-                .build();
+        .id(request.getId())
+        .employeeId(employee.getId())
+        .employeeName(employee.getFirstName() + " " + employee.getLastName())
+        .requestType(request.getRequestType().getName())
+        
+        // --- LÓGICA DE DETALLES Y FECHAS FALTANTE (AÑADIDA) ---
+        .details(request.getDetails())
+        .requestedDate(request.getRequestedDate())
+        .startDate(request.getStartDate())
+        .endDate(request.getEndDate())
+        // -----------------------------------------------------
+
+        .status(request.getStatus())
+        .build();
     }
+
+    
+    /**
+     * Obtiene todas las solicitudes del usuario autenticado (empleado).
+     * @param userId ID del usuario autenticado (proviene del token JWT).
+     * @return Lista de solicitudes mapeadas a DTOs.
+     */
+    public List<RequestResponseDTO> getMyRequests(Long userId) {
+        
+        // 1. Buscar el empleado a partir del userId (CRÍTICO para la seguridad)
+        Employee employee = employeeRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Empleado no encontrado para el usuario autenticado."));
+        
+        // 2. Obtener las solicitudes de ese empleado
+        List<EmployeeRequest> requests = requestRepository.findByEmployee(employee);
+        
+        // 3. Mapear la lista de entidades a DTOs de respuesta limpios
+        return requests.stream()
+                .map(this::mapToRequestResponseDTO) // Usamos el método de mapeo auxiliar
+                .collect(Collectors.toList());
+    }
+    
+    /**
+     * Obtiene todas las solicitudes de la base de datos (para vista de Admin/RRHH).
+     * Nota: Este método debe ser llamado por el RequestController GET /api/requests
+     * @return Lista de todas las solicitudes mapeadas a DTOs.
+     */
+    @Transactional(readOnly = true) // Indicamos que esta operación es solo de lectura
+    public List<RequestResponseDTO> getAllRequests() {
+        
+        // 1. Obtener todas las entidades de solicitud
+        List<EmployeeRequest> requests = requestRepository.findAll();
+        
+        // 2. Mapear la lista de entidades a una lista de DTOs de respuesta limpios
+        return requests.stream()
+                .map(this::mapToRequestResponseDTO) // Usamos el método de mapeo auxiliar
+                .collect(Collectors.toList());
+    }
+    
+   
 
 }
