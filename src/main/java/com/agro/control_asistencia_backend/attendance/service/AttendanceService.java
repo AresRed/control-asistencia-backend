@@ -86,33 +86,32 @@ public class AttendanceService {
         return true;
     }
 
+    @Transactional(readOnly = true)
     public List<EmployeeStatusDTO> getDailyAttendanceStatus(LocalDate date) {
         List<Employee> employees = employeeRepository.findAll();
-        LocalDate today = LocalDate.now();
 
         return employees.stream().map(employee -> {
-            // Encuentra el último registro para determinar el estado
             Optional<AttendanceRecord> lastRecord = attendanceRepository
                     .findTopByEmployeeOrderByDeviceTimestampDesc(employee);
 
             EmployeeStatusDTO dto = new EmployeeStatusDTO();
             dto.setEmployeeId(employee.getId());
+            dto.setEmployeeCode(employee.getEmployeeCode());
             dto.setFullName(employee.getFirstName() + " " + employee.getLastName());
-            dto.setPosition(employee.getPosition());
-
+            dto.setPosition(employee.getPosition().getName());            dto.setBiometricHash(employee.getBiometricHash());
             dto.setReportDate(date);
 
             if (lastRecord.isEmpty() || lastRecord.get().getDeviceTimestamp().toLocalDate().isBefore(date)) {
-                dto.setStatus("NO_REGISTRADO"); // No hay registros hoy
+                dto.setStatus("NO_REGISTRADO");
                 dto.setLastMarkTime(null);
             } else {
-                String type = lastRecord.get().getRecordType(); // "IN" o "OUT"
+                String type = lastRecord.get().getRecordType();
                 dto.setLastMarkTime(lastRecord.get().getDeviceTimestamp().toLocalTime());
 
                 if ("IN".equals(type)) {
-                    dto.setStatus("ASISTIO"); // Entró pero no ha salido
+                    dto.setStatus("ASISTIO");
                 } else {
-                    dto.setStatus("SALIO"); // Entró y ya salió
+                    dto.setStatus("SALIO");
                 }
             }
             return dto;

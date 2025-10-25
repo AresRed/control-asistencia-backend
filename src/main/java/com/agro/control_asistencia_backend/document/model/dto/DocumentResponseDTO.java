@@ -16,6 +16,7 @@ public class DocumentResponseDTO {
     private String documentType;
     private String employeeCode; 
     private LocalDateTime uploadDate;
-    // La URL para descargar el archivo (la construiremos en el Controller)
+    private String employeeName;
+  
     private String downloadUrl;
 }

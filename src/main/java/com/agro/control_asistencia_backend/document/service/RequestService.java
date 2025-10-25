@@ -8,7 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional; // 
 
-import com.agro.control_asistencia_backend.document.model.dto.EmployeeRequestDTO;
+import com.agro.control_asistencia_backend.document.model.dto.RequestCreateDTO;
 import com.agro.control_asistencia_backend.document.model.dto.RequestResponseDTO;
 import com.agro.control_asistencia_backend.document.model.entity.EmployeeRequest;
 import com.agro.control_asistencia_backend.document.model.entity.RequestType;
@@ -46,12 +46,10 @@ public class RequestService {
      * @return La solicitud creada.
      */
     @Transactional
-    public RequestResponseDTO createRequest(EmployeeRequestDTO requestDTO, Long userId) {
+    public RequestResponseDTO createRequest(RequestCreateDTO requestDTO, Long userId) {
 
-        // 1. Encontrar el Empleado a partir del ID de Usuario (CRÍTICO)
-        // **Asegúrate de que tu EmployeeRepository tenga este método: findByUserId(Long
-        // userId)**
-        Optional<Employee> employeeOpt = employeeRepository.findById(userId);
+      
+        Optional<Employee> employeeOpt = employeeRepository.findByUserId(userId);
 
         if (employeeOpt.isEmpty()) {
             throw new RuntimeException("Error: Empleado no encontrado para el usuario autenticado.");
@@ -74,21 +72,10 @@ public class RequestService {
         newRequest.setDetails(requestDTO.getDetails());
         newRequest.setStartDate(requestDTO.getStartDate());
         newRequest.setEndDate(requestDTO.getEndDate());
-        // El estado por defecto es "PENDING" (definido en la entidad)
+
         EmployeeRequest savedRequest = requestRepository.save(newRequest); // Guardar
 
-        return RequestResponseDTO.builder()
-                .id(savedRequest.getId())
-                .employeeId(employee.getId())
-                .employeeName(employee.getFirstName() + " " + employee.getLastName())
-                .requestType(requestType.getName())
-                .details(savedRequest.getDetails())
-                .requestedDate(savedRequest.getRequestedDate())
-                .startDate(savedRequest.getStartDate())
-                .endDate(savedRequest.getEndDate())
-                .status(savedRequest.getStatus())
-                .build();
-
+        return mapToRequestResponseDTO(savedRequest);
     }
 
     @Transactional
@@ -111,20 +98,7 @@ public class RequestService {
         // estado.
 
         // Mapear la entidad guardada al DTO de Respuesta
-        return RequestResponseDTO.builder()
-        .id(savedRequest.getId())
-        .employeeId(savedRequest.getEmployee().getId())
-        .employeeName(savedRequest.getEmployee().getFirstName() + " " + savedRequest.getEmployee().getLastName())
-        .requestType(savedRequest.getRequestType().getName())
-        
-        // ¡AGREGAR ESTOS CAMPOS FALTANTES!
-        .details(savedRequest.getDetails())
-        .requestedDate(savedRequest.getRequestedDate())
-        .startDate(savedRequest.getStartDate())
-        .endDate(savedRequest.getEndDate())
-        
-        .status(savedRequest.getStatus())
-        .build(); // Usaremos un método de mapeo auxiliar
+        return mapToRequestResponseDTO(savedRequest);
     }
 
     // Método auxiliar (debe ser implementado en tu servicio)
@@ -136,15 +110,12 @@ public class RequestService {
         .employeeId(employee.getId())
         .employeeName(employee.getFirstName() + " " + employee.getLastName())
         .requestType(request.getRequestType().getName())
-        
-        // --- LÓGICA DE DETALLES Y FECHAS FALTANTE (AÑADIDA) ---
         .details(request.getDetails())
-        .requestedDate(request.getRequestedDate())
+        .requestedDate(request.getRequestedDate().toLocalDate()) 
         .startDate(request.getStartDate())
         .endDate(request.getEndDate())
-        // -----------------------------------------------------
-
         .status(request.getStatus())
+        .managerComment(request.getManagerComment())
         .build();
     }
 
@@ -157,7 +128,7 @@ public class RequestService {
     public List<RequestResponseDTO> getMyRequests(Long userId) {
         
         // 1. Buscar el empleado a partir del userId (CRÍTICO para la seguridad)
-        Employee employee = employeeRepository.findById(userId)
+        Employee employee = employeeRepository.findByUserId(userId)
                 .orElseThrow(() -> new RuntimeException("Empleado no encontrado para el usuario autenticado."));
         
         // 2. Obtener las solicitudes de ese empleado

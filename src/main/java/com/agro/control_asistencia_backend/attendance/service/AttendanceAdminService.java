@@ -29,10 +29,7 @@ public class AttendanceAdminService {
         this.attendanceRepository = attendanceRepository;
     }
 
-    /**
-     * Obtiene el estado de asistencia de TODOS los empleados para una fecha dada.
-     * Este método es llamado por el AttendanceController (GET /status/daily).
-     */
+    
     public List<EmployeeStatusDTO> getDailyAttendanceStatus(LocalDate date) {
         // 1. Obtener la lista de todos los empleados
         List<Employee> employees = employeeRepository.findAll();
@@ -48,8 +45,7 @@ public class AttendanceAdminService {
             dto.setEmployeeId(employee.getId());
             dto.setEmployeeCode(employee.getEmployeeCode());
             dto.setFullName(employee.getFirstName() + " " + employee.getLastName());
-            dto.setPosition(employee.getPosition());
-            dto.setBiometricHash(employee.getBiometricHash());
+            dto.setPosition(employee.getPosition().getName());            dto.setBiometricHash(employee.getBiometricHash());
             dto.setReportDate(date);
             
             // LÓGICA CLAVE PARA DETERMINAR EL ESTADO

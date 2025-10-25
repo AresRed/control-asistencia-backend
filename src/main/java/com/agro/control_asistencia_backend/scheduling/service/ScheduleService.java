@@ -2,8 +2,8 @@ package com.agro.control_asistencia_backend.scheduling.service;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.List;
 import java.util.Optional;
-
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -18,8 +18,6 @@ import com.agro.control_asistencia_backend.scheduling.model.entity.EmployeeSched
 import com.agro.control_asistencia_backend.scheduling.model.entity.WorkSchedule;
 import com.agro.control_asistencia_backend.scheduling.repository.EmployeeScheduleRepository;
 import com.agro.control_asistencia_backend.scheduling.repository.WorkScheduleRepository;
-
-
 
 @Service
 public class ScheduleService {
@@ -68,7 +66,6 @@ public class ScheduleService {
                 .orElseThrow(
                         () -> new RuntimeException("Turno de trabajo no encontrado con ID: " + dto.getScheduleId()));
 
-
         EmployeeSchedule assignment = new EmployeeSchedule();
         assignment.setEmployee(employee);
         assignment.setWorkSchedule(schedule);
@@ -79,7 +76,7 @@ public class ScheduleService {
         EmployeeSchedule savedAssignment = employeeScheduleRepository.save(assignment);
 
         return ScheduleResponseDTO.builder()
-                .assignmentId(savedAssignment.getId())
+                .id(assignment.getId())
                 .employeeId(employee.getId())
                 .employeeCode(employee.getEmployeeCode())
                 .scheduleName(schedule.getName())
@@ -91,28 +88,58 @@ public class ScheduleService {
                 .build();
     }
 
-    public Optional<EmployeeSchedule> getEmployeeScheduleByUserId(Long userId, LocalDate date) {
+    private ScheduleResponseDTO mapToResponseDTO(EmployeeSchedule assignment) {
+        WorkSchedule schedule = assignment.getWorkSchedule(); // Acceder a la relación dentro del @Transactional
+        
+        return ScheduleResponseDTO.builder()
+                .id(assignment.getId())
+                .validFrom(assignment.getValidFrom())
+                .validTo(assignment.getValidTo())
+                .workingDays(assignment.getWorkingDays())
+                .scheduleId(schedule.getId())
+                .scheduleName(schedule.getName())
+                .startTime(schedule.getStartTime())
+                .endTime(schedule.getEndTime())
+                .toleranceMinutes(schedule.getToleranceMinutes())
+                .build();
+    }
+    @Transactional(readOnly = true)
+    public Optional<ScheduleResponseDTO> getEmployeeScheduleByUserId(Long userId, LocalDate date) {
 
         Employee employee = employeeRepository.findByUserId(userId)
-                .orElseThrow(() -> new RuntimeException("Empleado no encontrado."));
+            .orElseThrow(() -> new RuntimeException("Empleado no encontrado para la asignación de horario."));
+        Optional<EmployeeSchedule> scheduleOpt = employeeScheduleRepository
+                .findTopByEmployeeOrderByValidFromDesc(employee);
 
-        return employeeScheduleRepository.findTopByEmployeeOrderByValidFromDesc(employee);
+        if (scheduleOpt.isEmpty()) {
+            return Optional.empty();
+        }
+
+        // 💡 CRÍTICO: Mapear la entidad al DTO
+        return scheduleOpt.map(this::mapToResponseDTO);
 
     }
+  
 
     @Transactional(readOnly = true)
     public LocalTime getScheduledEndTime(Long employeeId, LocalDate date) {
-        
+
         Employee employee = employeeRepository.findById(employeeId)
                 .orElseThrow(() -> new RuntimeException("Empleado no encontrado."));
-        
-        Optional<EmployeeSchedule> activeAssignment = employeeScheduleRepository.findTopByEmployeeOrderByValidFromDesc(employee);
+
+        Optional<EmployeeSchedule> activeAssignment = employeeScheduleRepository
+                .findTopByEmployeeOrderByValidFromDesc(employee);
 
         if (activeAssignment.isPresent() && activeAssignment.get().getWorkSchedule() != null) {
-            
+
             return activeAssignment.get().getWorkSchedule().getEndTime();
         }
 
-        return LocalTime.of(17, 0); 
+        return LocalTime.of(17, 0);
+    }
+
+    @Transactional(readOnly = true)
+    public List<WorkSchedule> getAllWorkSchedules() {
+        return workScheduleRepository.findAll();
     }
 }

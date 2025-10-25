@@ -1,6 +1,7 @@
 package com.agro.control_asistencia_backend.scheduling.controller;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.agro.control_asistencia_backend.scheduling.model.dto.EmployeeScheduleAssignmentDTO;
@@ -26,7 +28,7 @@ import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api/schedules")
-@PreAuthorize("hasRole('ADMIN') or hasRole('RRHH')")
+
 public class ScheduleController {
 
     private final ScheduleService scheduleService;
@@ -40,6 +42,7 @@ public class ScheduleController {
      * Endpoint: POST /api/schedules/turn (Crea una plantilla de turno)
      */
     @PostMapping("/turn")
+
     public ResponseEntity<WorkSchedule> createWorkSchedule(@Valid @RequestBody WorkScheduleDTO dto) {
         WorkSchedule schedule = scheduleService.createWorkSchedule(dto);
         return new ResponseEntity<>(schedule, HttpStatus.CREATED);
@@ -49,25 +52,39 @@ public class ScheduleController {
      * Endpoint: POST /api/schedules/assign (Asigna un turno a un empleado)
      */
     @PostMapping("/assign")
+
     public ResponseEntity<ScheduleResponseDTO> assignSchedule(@Valid @RequestBody EmployeeScheduleAssignmentDTO dto) {
-        ScheduleResponseDTO  assignment = scheduleService.assignScheduleToEmployee(dto);
-        return  ResponseEntity.status(HttpStatus.CREATED).body(assignment);
+        ScheduleResponseDTO assignment = scheduleService.assignScheduleToEmployee(dto);
+        return ResponseEntity.status(HttpStatus.CREATED).body(assignment);
     }
 
-    @GetMapping("/me")
-@PreAuthorize("hasRole('EMPLOYEE') or hasRole('ADMIN') or hasRole('RRHH')")
-public ResponseEntity<EmployeeSchedule> getMySchedule(@AuthenticationPrincipal UserDetailsImpl userDetails) {
+   
+    @GetMapping 
     
-    // NOTA: Asumiremos que el servicio puede obtener el EmployeeSchedule activo
-    Optional<EmployeeSchedule> scheduleOpt = scheduleService.getEmployeeScheduleByUserId(userDetails.getId(), LocalDate.now());
-
-    if (scheduleOpt.isEmpty()) {
-        // Devuelve un 404 si no hay horario activo asignado
-        return ResponseEntity.notFound().build(); 
+    public ResponseEntity<List<WorkSchedule>> getAllWorkSchedules() {
+        List<WorkSchedule> schedules = scheduleService.getAllWorkSchedules();
+        return ResponseEntity.ok(schedules);
     }
-    
-    // NOTA CRÍTICA: Devolvemos la Entidad aquí, lo cual puede dar ByteBuddyInterceptor.
-    // Lo ideal es devolver un DTO simple para evitar errores de serialización.
-    return ResponseEntity.ok(scheduleOpt.get());
-}
+
+    @GetMapping("/me/weekly")
+   
+    public ResponseEntity<ScheduleResponseDTO> getMyWeeklySchedule(
+            @AuthenticationPrincipal UserDetailsImpl userDetails,
+            @RequestParam LocalDate date) { // Recibe la fecha de inicio de semana
+        
+        // 1. Obtener el ID del empleado
+        Long userId = userDetails.getId(); 
+
+        // 2. Llamar al servicio para obtener la asignación de horario válida
+        // NOTA: Asumimos que el servicio devuelve la asignación activa para esa fecha
+        Optional<ScheduleResponseDTO> scheduleOpt = scheduleService.getEmployeeScheduleByUserId(userId, date);
+        if (scheduleOpt.isEmpty()) {
+            // 💡 No encontrado: Devuelve una respuesta 404
+            return ResponseEntity.notFound().build(); 
+        }
+        
+        // 3. Devolver la Entidad EmployeeSchedule (Asignación)
+        // CRÍTICO: Idealmente, esto devolvería un DTO, pero devolvemos la Entidad para simplificar.
+        return ResponseEntity.ok(scheduleOpt.get());
+    }
 }

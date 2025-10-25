@@ -16,11 +16,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.agro.control_asistencia_backend.employee.model.entity.Employee;
+
 import com.agro.control_asistencia_backend.employee.service.EmployeeService;
 import com.agro.control_asistencia_backend.reporting.model.dto.DailyWorkSummary;
-import com.agro.control_asistencia_backend.reporting.model.dto.EmployeeHourSummaryDTO;
-import com.agro.control_asistencia_backend.reporting.model.dto.EmployeeProfileDTO;
+
+
 import com.agro.control_asistencia_backend.reporting.service.ReportingService;
 import com.agro.control_asistencia_backend.segurity.service.UserDetailsImpl;
 import org.springframework.core.io.Resource;
@@ -57,6 +57,7 @@ public class ReportingController {
     @GetMapping("/me")
     @PreAuthorize("hasRole('EMPLOYEE') or hasRole('ADMIN') or hasRole('RRHH')") // Asegura que el trabajador pueda verlo
     public ResponseEntity<List<DailyWorkSummary>> getMyReport(
+        
             @AuthenticationPrincipal UserDetailsImpl userDetails, // Obtiene el ID del usuario logueado
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate start,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate end) {

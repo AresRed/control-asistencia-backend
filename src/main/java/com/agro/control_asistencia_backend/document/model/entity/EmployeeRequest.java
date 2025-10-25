@@ -1,4 +1,5 @@
 package com.agro.control_asistencia_backend.document.model.entity;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import com.agro.control_asistencia_backend.employee.model.entity.Employee;
 import jakarta.persistence.Column;
@@ -31,10 +32,9 @@ public class EmployeeRequest {
 
     // Campos de la solicitud
     private String details;
-    private LocalDateTime requestedDate = LocalDateTime.now();
-    private LocalDateTime startDate; // Fecha de inicio del permiso/vacación
-    private LocalDateTime endDate; // Fecha de fin del permiso/vacación
-
+    private LocalDate startDate; // Fecha de inicio del permiso/vacación
+    private LocalDate endDate; // Fecha de fin del permiso/vacación
+private LocalDateTime requestedDate = LocalDateTime.now();
     // Estado de la gestión: PENDING, APPROVED, REJECTED
     @Column(length = 20, nullable = false)
     private String status = "PENDING";

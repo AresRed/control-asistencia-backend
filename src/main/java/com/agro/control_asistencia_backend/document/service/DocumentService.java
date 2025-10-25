@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.agro.control_asistencia_backend.document.model.dto.CertificateCreationDTO;
 import com.agro.control_asistencia_backend.document.model.dto.DocumentResponseDTO;
 import com.agro.control_asistencia_backend.document.model.entity.Document;
 import com.agro.control_asistencia_backend.document.model.entity.DocumentTemplate;
@@ -182,5 +183,55 @@ public class DocumentService {
 
                 // 2. Usar el repositorio para filtrar
                 return documentRepository.findByEmployee(employee);
+        }
+
+        private DocumentResponseDTO mapToResponseDTO(Document doc) {
+        
+                // Asumimos que la entidad Employee está cargada (EAGERLY o dentro de la transacción)
+                Employee employee = doc.getEmployee();
+                
+                return DocumentResponseDTO.builder()
+                        .id(doc.getId())
+                        .fileName(doc.getFileName())
+                        .documentType(doc.getDocumentType())
+                        // 💡 Mapear el código y el nombre del empleado a partir de la relación
+                        .employeeCode(employee.getEmployeeCode())
+                        .employeeName(employee.getFirstName() + " " + employee.getLastName()) 
+                        .uploadDate(doc.getUploadDate())
+                        // Generar la URL de descarga basada en el ID
+                        .downloadUrl("/api/documents/" + doc.getId() + "/download") 
+                        .build();
+            }
+        @Transactional
+        public DocumentResponseDTO createCertificateRecord(CertificateCreationDTO dto) {
+
+                Employee employee = employeeRepository.findById(dto.getEmployeeId())
+                                .orElseThrow(() -> new RuntimeException("Empleado no encontrado."));
+
+                Document doc = new Document();
+                doc.setEmployee(employee);
+                doc.setFileName(dto.getTitle() + "_" + dto.getIssueDate() + ".pdf"); // Generar un nombre de archivo
+                doc.setDocumentType(dto.getDocumentType());
+                doc.setContentType("application/pdf");
+                doc.setStoragePath(dto.getStoragePath()); // Usar la ruta del DTO
+                doc.setUploadedBy("SYSTEM/RRHH"); // Definir quién lo subió
+                // ... otros setters
+
+                Document savedDoc = documentRepository.save(doc);
+                return mapToResponseDTO(savedDoc); // Devolver el DTO limpio
+        }
+
+        @Transactional (readOnly = true)
+
+        public List<DocumentResponseDTO> getCertificatesByUserId(Long userId) {
+                Employee employee = employeeRepository.findByUserId(userId)
+                                .orElseThrow(() -> new RuntimeException("Perfil no encontrado."));
+
+                // Filtrar los documentos por empleado donde el documentType es 'CERTIFICADO'
+                return documentRepository.findByEmployee(employee).stream()
+                                .filter(d -> d.getDocumentType().toUpperCase().contains("CERTIFICADO")
+                                                || d.getDocumentType().toUpperCase().contains("DIPLOMA"))
+                                .map(this::mapToResponseDTO)
+                                .collect(Collectors.toList());
         }
 }

@@ -1,7 +1,9 @@
 package com.agro.control_asistencia_backend.employee.controller;
 
 import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -9,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -17,12 +20,18 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import com.agro.control_asistencia_backend.employee.model.dto.EmployeeRequestDTO;
 import com.agro.control_asistencia_backend.employee.model.dto.EmployeeResponseDTO;
+import com.agro.control_asistencia_backend.employee.model.dto.EmployeeProfileUpdateDTO;
 import com.agro.control_asistencia_backend.employee.model.dto.ManagerContactDTO;
+import com.agro.control_asistencia_backend.employee.model.dto.PasswordResetDTO;
+import com.agro.control_asistencia_backend.employee.model.dto.WorkPositionCreationDTO;
 import com.agro.control_asistencia_backend.employee.model.entity.Employee;
+import com.agro.control_asistencia_backend.employee.model.entity.WorkPosition;
 import com.agro.control_asistencia_backend.employee.service.EmployeeService;
+import com.agro.control_asistencia_backend.employee.service.WorkPositionService;
 import com.agro.control_asistencia_backend.reporting.model.dto.EmployeeHourSummaryDTO;
 import com.agro.control_asistencia_backend.reporting.model.dto.EmployeeProfileDTO;
 import com.agro.control_asistencia_backend.reporting.service.ReportingService;
+import com.agro.control_asistencia_backend.segurity.controller.MessageResponse;
 import com.agro.control_asistencia_backend.segurity.service.UserDetailsImpl;
 
 import jakarta.validation.Valid;
@@ -33,12 +42,14 @@ public class EmployeeController {
 
     // 1. Inyección de servicios FINAL
     private final EmployeeService employeeService;
-    private final ReportingService reportingService; // <--- ¡CRÍTICO: Inyección de Reportes!
+    private final ReportingService reportingService;
+    private final WorkPositionService workPositionService;
 
     @Autowired
-    public EmployeeController(EmployeeService employeeService, ReportingService reportingService) {
+    public EmployeeController(EmployeeService employeeService, ReportingService reportingService,WorkPositionService workPositionService) {
         this.employeeService = employeeService;
         this.reportingService = reportingService;
+        this.workPositionService = workPositionService;
     }
 
     // -------------------------------------------------------------------------
@@ -47,19 +58,16 @@ public class EmployeeController {
 
     @PostMapping
     @PreAuthorize("hasRole('ADMIN') or hasRole('RRHH')")
-    // ⚠️ Mejor práctica: Devolver el DTO de respuesta, no la Entidad JPA
     public ResponseEntity<EmployeeResponseDTO> createEmployee(@Valid @RequestBody EmployeeRequestDTO employeeDTO) {
-        // Asumimos que employeeService.createEmployee devuelve EmployeeResponseDTO
-        EmployeeResponseDTO newEmployee = employeeService.createEmployee(employeeDTO); 
+        EmployeeResponseDTO newEmployee = employeeService.createEmployee(employeeDTO);
         return new ResponseEntity<>(newEmployee, HttpStatus.CREATED);
     }
 
     @GetMapping
     @PreAuthorize("hasRole('ADMIN') or hasRole('RRHH')")
-    // ⚠️ Mejor práctica: Devolver la lista de DTOs
     public ResponseEntity<List<EmployeeResponseDTO>> getAllEmployees() {
-        // Asumimos que employeeService.getAllEmployees ya devuelve List<EmployeeResponseDTO>
-        List<EmployeeResponseDTO> employees = employeeService.getAllEmployees(); 
+
+        List<EmployeeResponseDTO> employees = employeeService.getAllEmployees();
         return ResponseEntity.ok(employees);
     }
 
@@ -68,8 +76,8 @@ public class EmployeeController {
     // Se elimina el método duplicado y se mantiene el DTO
     // -------------------------------------------------------------------------
 
-    @GetMapping("/me") // ÚNICA RUTA /me en este controlador
-    @PreAuthorize("isAuthenticated()") 
+    @GetMapping("/me")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<EmployeeProfileDTO> getMyProfile(@AuthenticationPrincipal UserDetailsImpl userDetails) {
         Long userId = userDetails.getId();
 
@@ -82,7 +90,7 @@ public class EmployeeController {
         EmployeeHourSummaryDTO summary = reportingService.getEmployeeHourSummary(employee.getId(), startDate, endDate);
 
         // Combina los datos de Employee y el Resumen en el DTO final
-        EmployeeProfileDTO profileDTO = new EmployeeProfileDTO(employee, summary); 
+        EmployeeProfileDTO profileDTO = new EmployeeProfileDTO(employee, summary);
 
         return ResponseEntity.ok(profileDTO);
     }
@@ -90,12 +98,12 @@ public class EmployeeController {
     // -------------------------------------------------------------------------
     // ENDPOINT DE ACTUALIZACIÓN (PUT)
     // -------------------------------------------------------------------------
-    
+
     @PutMapping("/me")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<EmployeeProfileDTO> updateMyProfile( // ⚠️ Devolver el DTO actualizado
+    public ResponseEntity<EmployeeProfileDTO> updateMyProfile(
             @AuthenticationPrincipal UserDetailsImpl userDetails,
-            @Valid @RequestBody EmployeeRequestDTO profileUpdateDTO) { 
+            @Valid @RequestBody EmployeeProfileUpdateDTO profileUpdateDTO) {
 
         EmployeeProfileDTO updatedEmployee = employeeService.updateProfile(userDetails.getId(), profileUpdateDTO);
 
@@ -107,12 +115,74 @@ public class EmployeeController {
     // -------------------------------------------------------------------------
 
     @GetMapping("/managers")
-    @PreAuthorize("isAuthenticated()") 
-    public ResponseEntity<List<ManagerContactDTO>> getManagers(@RequestParam List<String> roles) { 
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<List<ManagerContactDTO>> getManagers(@RequestParam List<String> roles) {
 
         String[] roleArray = roles.toArray(new String[0]);
 
         List<ManagerContactDTO> managers = employeeService.getManagersByRoles(roleArray);
         return ResponseEntity.ok(managers);
     }
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<?> requestPasswordReset(@RequestBody String email) {
+        employeeService.createPasswordResetToken(email);
+        return ResponseEntity.ok(new MessageResponse("Instrucciones enviadas al correo."));
+    }
+
+    // 2. POST /api/auth/reset-password (FINALIZA EL PROCESO)
+    @PostMapping("/reset-password")
+    public ResponseEntity<?> resetPassword(@RequestBody PasswordResetDTO resetDTO) {
+        if (!resetDTO.getNewPassword().equals(resetDTO.getConfirmPassword())) {
+            return ResponseEntity.badRequest().body(new MessageResponse("Las contraseñas no coinciden."));
+        }
+
+        employeeService.resetPassword(resetDTO.getToken(), resetDTO.getNewPassword());
+        return ResponseEntity.ok(new MessageResponse("Contraseña actualizada con éxito."));
+    }
+
+    @PostMapping("/positions")
+    @PreAuthorize("hasRole('ADMIN')") 
+    public ResponseEntity<WorkPosition> createPosition(@Valid @RequestBody WorkPositionCreationDTO creationDTO) {
+        // Llama al servicio para crear y validar el cargo
+        WorkPosition newPosition = workPositionService.createPosition(creationDTO.getName());
+        return new ResponseEntity<>(newPosition, HttpStatus.CREATED);
+    }
+    @GetMapping("/positions")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('RRHH')")
+    public ResponseEntity<List<WorkPosition>> getAllPositions() {
+        // Usa el WorkPositionService para obtener la lista
+        List<WorkPosition> positions = workPositionService.getAllPositions();
+        return ResponseEntity.ok(positions);
+    }
+
+    // -------------------------------------------------------------------------
+    // ENDPOINTS DE GESTIÓN DE ESTADO DE USUARIOS (ACTIVAR/DESACTIVAR)
+    // -------------------------------------------------------------------------
+
+    @PostMapping("/{userId}/activate")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> activateUser(@PathVariable Long userId) {
+        return employeeService.activateUser(userId);
+    }
+
+    @PostMapping("/{userId}/deactivate")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> deactivateUser(@PathVariable Long userId) {
+        return employeeService.deactivateUser(userId);
+    }
+
+    @GetMapping("/{userId}/status")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('RRHH')")
+    public ResponseEntity<Map<String, Object>> getUserStatus(@PathVariable Long userId) {
+        boolean isActive = employeeService.isUserActive(userId);
+        Map<String, Object> response = new HashMap<>();
+        response.put("userId", userId);
+        response.put("isActive", isActive);
+        response.put("status", isActive ? "ACTIVO" : "SUSPENDIDO");
+        return ResponseEntity.ok(response);
+    }
+
+    
+
 }

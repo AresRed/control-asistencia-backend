@@ -16,11 +16,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.agro.control_asistencia_backend.document.model.dto.EmployeeRequestDTO;
+import com.agro.control_asistencia_backend.document.model.dto.RequestCreateDTO;
 import com.agro.control_asistencia_backend.document.model.dto.RequestResponseDTO;
-import com.agro.control_asistencia_backend.document.model.entity.EmployeeRequest;
 import com.agro.control_asistencia_backend.document.repository.EmployeeRequestRepository;
-import com.agro.control_asistencia_backend.document.service.DocumentService;
 import com.agro.control_asistencia_backend.document.service.RequestService;
 import com.agro.control_asistencia_backend.segurity.service.UserDetailsImpl;
 
@@ -49,7 +47,7 @@ public class RequestController {
     @PostMapping
     @PreAuthorize("hasRole('EMPLOYEE') or hasRole('ADMIN')") // El empleado es el que debe hacer esto
     public ResponseEntity<RequestResponseDTO> createEmployeeRequest(
-            @Valid @RequestBody EmployeeRequestDTO requestDTO,
+            @Valid @RequestBody RequestCreateDTO requestDTO,
             @AuthenticationPrincipal UserDetailsImpl userDetails) {
 
         Long userId = userDetails.getId();
