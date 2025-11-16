@@ -46,7 +46,7 @@ public class EmployeeService {
     private final ReportingService reportingService;
     private PasswordResetTokenRepository tokenRepository;
     private final WorkPositionService workPositionService;
-    private static final int EXPIRATION_TIME_MINUTES = 10;
+    private static final int EXPIRATION_TIME_MINUTES = 5;
 
     @Autowired
     public EmployeeService(EmployeeRepository employeeRepository, UserRepository userRepository,
@@ -59,7 +59,7 @@ public class EmployeeService {
         this.passwordEncoder = passwordEncoder;
         this.emailService = emailService;
         this.reportingService = reportingService;
-        this.workPositionService=workPositionService;
+        this.workPositionService = workPositionService;
     }
 
     // -------------------------------------------------------------------------
@@ -93,7 +93,7 @@ public class EmployeeService {
     public EmployeeResponseDTO createEmployee(EmployeeRequestDTO requestDTO) {
 
         // 1. Validaciones (omitidas por brevedad)
-        WorkPosition position = workPositionService.getPositionById(requestDTO.getPositionId()); 
+        WorkPosition position = workPositionService.getPositionById(requestDTO.getPositionId());
 
         // 2. Buscar Rol y crear User
         ERole roleEnum = ERole.valueOf(requestDTO.getRoleName());
@@ -106,7 +106,7 @@ public class EmployeeService {
         user.setRole(employeeRole);
         user.setEnabled(true);
         user = userRepository.save(user);
-        Employee employee = new Employee(); 
+        Employee employee = new Employee();
         employee.setEmployeeCode(requestDTO.getEmployeeCode());
         employee.setFirstName(requestDTO.getFirstName());
         employee.setLastName(requestDTO.getLastName());
@@ -115,7 +115,7 @@ public class EmployeeService {
 
         // 💡 CRÍTICO: Asignar DNI, Email, Teléfono y Address (Se asume que address no
         // viene en el DTO y es nulo)
-        employee.setDni(requestDTO.getDni()); 
+        employee.setDni(requestDTO.getDni());
         employee.setHireDate(LocalDate.now());
         employee.setEmail(requestDTO.getEmail());
         employee.setPhoneNumber(requestDTO.getPhoneNumber());
@@ -231,24 +231,32 @@ public class EmployeeService {
 
     @Transactional
     public String createPasswordResetToken(String userEmail) {
-        Employee employee = employeeRepository.findByEmail(userEmail) // Asumimos que tienes un findByEmail en UserRepository
+
+        // 1. Buscar el Employee por email (asumimos que findByEmail está en
+        // EmployeeRepository)
+        Employee employee = employeeRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado con ese email."));
 
+        // 2. Obtener el User asociado al Employee
         User user = employee.getUser();
-        String token = UUID.randomUUID().toString();
-        Date expiryDate = calculateExpiryDate();
 
-        // Guardar token
+        // 3. Generar token único (UUID) y calcular expiración
+        String token = UUID.randomUUID().toString();
+        Date expiryDate = calculateExpiryDate(); // Método auxiliar que calcula la expiración
+
+        // 4. Guardar token en la tabla PasswordResetToken
         PasswordResetToken myToken = new PasswordResetToken();
         myToken.setToken(token);
         myToken.setUser(user);
         myToken.setExpiryDate(expiryDate);
         tokenRepository.save(myToken);
 
-        // 💡 Lógica de Envío de Correo
-        String resetUrl = "http://localhost:4200/reset-password?token=" + token;
-        String subject = "Recuperación de Contraseña";
-        String body = "Haz clic en el siguiente enlace para restablecer tu contraseña: " + resetUrl;
+        // 5. Lógica de Envío de Correo
+        String resetUrl = "http://localhost:4200/reset-password?token=" + token; // URL del frontend
+        String subject = "Recuperación de Contraseña - AgroCYT";
+        String body = String.format(
+                "Hola %s,\n\nHaz clic en el siguiente enlace para restablecer tu contraseña:\n%s\n\nEste enlace expira en %d minutos.",
+                employee.getFirstName(), resetUrl, EXPIRATION_TIME_MINUTES);
 
         emailService.sendEmail(userEmail, subject, body);
 
@@ -291,15 +299,15 @@ public class EmployeeService {
     public ResponseEntity<?> activateUser(Long userId) {
         Employee employee = employeeRepository.findByUserId(userId)
                 .orElseThrow(() -> new RuntimeException("Empleado no encontrado."));
-        
+
         User user = employee.getUser();
         if (user == null) {
             return ResponseEntity.badRequest().body(new MessageResponse("Usuario no encontrado."));
         }
-        
+
         user.setEnabled(true);
         userRepository.save(user);
-        
+
         return ResponseEntity.ok(new MessageResponse("Usuario activado exitosamente."));
     }
 
@@ -307,15 +315,15 @@ public class EmployeeService {
     public ResponseEntity<?> deactivateUser(Long userId) {
         Employee employee = employeeRepository.findByUserId(userId)
                 .orElseThrow(() -> new RuntimeException("Empleado no encontrado."));
-        
+
         User user = employee.getUser();
         if (user == null) {
             return ResponseEntity.badRequest().body(new MessageResponse("Usuario no encontrado."));
         }
-        
+
         user.setEnabled(false);
         userRepository.save(user);
-        
+
         return ResponseEntity.ok(new MessageResponse("Usuario desactivado exitosamente."));
     }
 
@@ -323,8 +331,24 @@ public class EmployeeService {
     public boolean isUserActive(Long userId) {
         Employee employee = employeeRepository.findByUserId(userId)
                 .orElseThrow(() -> new RuntimeException("Empleado no encontrado."));
-        
+
         User user = employee.getUser();
         return user != null && user.isEnabled();
     }
+
+    @Transactional
+public void toggleUserAccountStatus(Long userId, boolean enable) {
+    User user = userRepository.findById(userId)
+            .orElseThrow(() -> new RuntimeException("Usuario no encontrado con ID: " + userId));
+
+    // CRÍTICO: No se puede suspender la cuenta del propio administrador
+    if (user.getRole().getName() == ERole.ROLE_ADMIN && !enable) {
+         throw new RuntimeException("No se puede suspender la cuenta del Administrador principal.");
+    }
+
+    user.setEnabled(enable); // Asume que el setter se llama setIsEnabled
+    userRepository.save(user);
+    
+    // Si la cuenta es suspendida, el sistema de seguridad lo bloqueará al intentar loguearse.
+}
 }

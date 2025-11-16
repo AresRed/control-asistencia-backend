@@ -46,7 +46,8 @@ public class EmployeeController {
     private final WorkPositionService workPositionService;
 
     @Autowired
-    public EmployeeController(EmployeeService employeeService, ReportingService reportingService,WorkPositionService workPositionService) {
+    public EmployeeController(EmployeeService employeeService, ReportingService reportingService,
+            WorkPositionService workPositionService) {
         this.employeeService = employeeService;
         this.reportingService = reportingService;
         this.workPositionService = workPositionService;
@@ -57,14 +58,14 @@ public class EmployeeController {
     // -------------------------------------------------------------------------
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN') or hasRole('RRHH')")
+
     public ResponseEntity<EmployeeResponseDTO> createEmployee(@Valid @RequestBody EmployeeRequestDTO employeeDTO) {
         EmployeeResponseDTO newEmployee = employeeService.createEmployee(employeeDTO);
         return new ResponseEntity<>(newEmployee, HttpStatus.CREATED);
     }
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN') or hasRole('RRHH')")
+
     public ResponseEntity<List<EmployeeResponseDTO>> getAllEmployees() {
 
         List<EmployeeResponseDTO> employees = employeeService.getAllEmployees();
@@ -142,14 +143,15 @@ public class EmployeeController {
     }
 
     @PostMapping("/positions")
-    @PreAuthorize("hasRole('ADMIN')") 
+
     public ResponseEntity<WorkPosition> createPosition(@Valid @RequestBody WorkPositionCreationDTO creationDTO) {
         // Llama al servicio para crear y validar el cargo
         WorkPosition newPosition = workPositionService.createPosition(creationDTO.getName());
         return new ResponseEntity<>(newPosition, HttpStatus.CREATED);
     }
+
     @GetMapping("/positions")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('RRHH')")
+
     public ResponseEntity<List<WorkPosition>> getAllPositions() {
         // Usa el WorkPositionService para obtener la lista
         List<WorkPosition> positions = workPositionService.getAllPositions();
@@ -160,20 +162,30 @@ public class EmployeeController {
     // ENDPOINTS DE GESTIÓN DE ESTADO DE USUARIOS (ACTIVAR/DESACTIVAR)
     // -------------------------------------------------------------------------
 
+    @PutMapping("/status/{userId}")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('RRHH')") // Solo gestión puede cambiar el estado
+    public ResponseEntity<MessageResponse> toggleUserStatus(
+            @PathVariable Long userId,
+            @RequestParam boolean enable) { // Recibe el estado booleano
+
+        employeeService.toggleUserAccountStatus(userId, enable);
+        return ResponseEntity.ok(new MessageResponse("Estado de cuenta actualizado con éxito."));
+    }
+
     @PostMapping("/{userId}/activate")
-    @PreAuthorize("hasRole('ADMIN')")
+
     public ResponseEntity<?> activateUser(@PathVariable Long userId) {
         return employeeService.activateUser(userId);
     }
 
     @PostMapping("/{userId}/deactivate")
-    @PreAuthorize("hasRole('ADMIN')")
+
     public ResponseEntity<?> deactivateUser(@PathVariable Long userId) {
         return employeeService.deactivateUser(userId);
     }
 
     @GetMapping("/{userId}/status")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('RRHH')")
+
     public ResponseEntity<Map<String, Object>> getUserStatus(@PathVariable Long userId) {
         boolean isActive = employeeService.isUserActive(userId);
         Map<String, Object> response = new HashMap<>();
@@ -182,7 +194,5 @@ public class EmployeeController {
         response.put("status", isActive ? "ACTIVO" : "SUSPENDIDO");
         return ResponseEntity.ok(response);
     }
-
-    
 
 }

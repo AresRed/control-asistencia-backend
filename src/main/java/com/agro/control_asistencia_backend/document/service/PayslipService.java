@@ -8,6 +8,7 @@ import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.agro.control_asistencia_backend.document.model.dto.PayslipResponseDTO;
 import com.agro.control_asistencia_backend.document.model.entity.Payslip;
 import com.agro.control_asistencia_backend.document.repository.PayslipRepository;
 import com.agro.control_asistencia_backend.employee.model.entity.Employee;
@@ -35,12 +36,30 @@ public class PayslipService {
         return payslipRepo.findByEmployee(employee);
     }
 
+    private PayslipResponseDTO mapToPayslipResponseDTO(Payslip payslip) {
+        Employee employee = payslip.getEmployee();
+        return PayslipResponseDTO.builder()
+                .id(payslip.getId())
+                .employeeId(employee.getId())
+                .employeeName(employee.getFirstName() + " " + employee.getLastName())
+                .employeeCode(employee.getEmployeeCode())
+                .periodStartDate(payslip.getPeriodStartDate())
+                .periodEndDate(payslip.getPeriodEndDate())
+                .grossSalary(payslip.getGrossSalary())
+                .bonuses(payslip.getBonuses())
+                .deductions(payslip.getDeductions())
+                .netSalary(payslip.getNetSalary())
+                .generationDate(payslip.getGenerationDate())
+                .filePath(payslip.getFilePath())
+                .build();
+    }
+
     /**
      * Método principal para generar una Boleta de Pago para un período.
      * Este método es el que debes usar.
      */
     @Transactional
-    public Payslip generatePayslip(Long employeeId, LocalDate start, LocalDate end) {
+    public PayslipResponseDTO generatePayslip(Long employeeId, LocalDate start, LocalDate end) {
 
         Employee employee = employeeRepo.findById(employeeId)
                 .orElseThrow(() -> new RuntimeException("Empleado no encontrado para generar boleta."));
@@ -72,32 +91,37 @@ public class PayslipService {
                 RoundingMode.HALF_UP);
 
         // Sueldo Fijo + Pago por Horas Trabajadas (Normales + Extra)
-        BigDecimal netSalary = employee.getFixedSalary().add(regularPay).add(overtimePay).setScale(2,
-                RoundingMode.HALF_UP);
+        BigDecimal grossSalary = employee.getFixedSalary().add(regularPay).add(overtimePay).setScale(2, RoundingMode.HALF_UP);
+        // Aquí podrías añadir lógica para deducciones y bonificaciones si las tuvieras
+        BigDecimal deductions = BigDecimal.ZERO; // Ejemplo, si no se calculan aquí
+        BigDecimal bonuses = BigDecimal.ZERO; // Ejemplo, si no se calculan aquí
 
-        // 3. Crear y SETEAR la Entidad Payslip (¡Corrección!)
+        BigDecimal netSalary = grossSalary.add(bonuses).subtract(deductions).setScale(2, RoundingMode.HALF_UP);
+
+        // 3. Crear y SETEAR la Entidad Payslip
         Payslip payslip = new Payslip();
         payslip.setEmployee(employee);
-        payslip.setPayPeriodStart(start);
-        payslip.setPayPeriodEnd(end);
+        payslip.setPeriodStartDate(start);
+        payslip.setPeriodEndDate(end);
 
         // Setear los valores calculados:
-        payslip.setTotalRegularMinutes(totalRegularMins);
-        payslip.setTotalOvertimeMinutes(totalOvertimeMins);
-        payslip.setRegularPay(regularPay);
-        payslip.setOvertimePay(overtimePay);
-        payslip.setNetSalary(netSalary); // Salario Neto final
+        payslip.setGrossSalary(grossSalary);
+        payslip.setBonuses(bonuses);
+        payslip.setDeductions(deductions);
+        payslip.setNetSalary(netSalary);
+        payslip.setGenerationDate(LocalDate.now());
 
         // 4. Generar y Almacenar el PDF (Simulado)
-        String documentPath = documentService.generatePayslipPdf(payslip);
-        payslip.setDocumentPath(documentPath);
+        String filePath = documentService.generatePayslipPdf(payslip);
+        payslip.setFilePath(filePath);
 
-        return payslipRepo.save(payslip);
+        Payslip savedPayslip = payslipRepo.save(payslip);
+        return mapToPayslipResponseDTO(savedPayslip);
     }
 
     @Transactional(readOnly = true)
-    public List<Payslip> getAllPayslips() {
-        return payslipRepo.findAll();
+    public List<PayslipResponseDTO> getAllPayslips() {
+        return payslipRepo.findAll().stream().map(this::mapToPayslipResponseDTO).collect(java.util.stream.Collectors.toList());
     }
 
     @Transactional(readOnly = true)
@@ -109,4 +133,11 @@ public class PayslipService {
     // 2. Usar el repositorio de Payslips para filtrar
     return payslipRepo.findByEmployee(employee);
 }
+
+    @Transactional(readOnly = true)
+    public List<PayslipResponseDTO> getPayslipsByUserId(Long userId) {
+        Employee employee = employeeRepo.findByUserId(userId)
+                .orElseThrow(() -> new RuntimeException("Perfil no encontrado."));
+        return payslipRepo.findByEmployee(employee).stream().map(this::mapToPayslipResponseDTO).collect(java.util.stream.Collectors.toList());
+    }
 }

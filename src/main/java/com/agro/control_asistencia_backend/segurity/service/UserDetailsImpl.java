@@ -14,11 +14,15 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @NoArgsConstructor
 @Getter
 @Setter
 public class UserDetailsImpl implements UserDetails {
+
+    private static final Logger logger = LoggerFactory.getLogger(UserDetailsImpl.class);
 
     private static final long serialVersionUID = 1L;
 
@@ -43,9 +47,9 @@ public class UserDetailsImpl implements UserDetails {
 
     public static UserDetailsImpl build(User user) {
 
-        // El enum ERole tiene valores como ROLE_ADMIN. Lo usamos directamente.
-        // El comentario anterior era incorrecto, el prefijo se estaba duplicando.
-        SimpleGrantedAuthority authority = new SimpleGrantedAuthority(user.getRole().getName().name());
+        String roleName = user.getRole().getName().name();
+        logger.info("Building UserDetails for {} with role: {}", user.getUsername(), roleName);
+        SimpleGrantedAuthority authority = new SimpleGrantedAuthority(roleName);
 
         return new UserDetailsImpl(
                 user.getId(),

@@ -44,7 +44,7 @@ public class ReportingController {
     // Permite a ADMIN y RRHH solicitar el reporte de un empleado.
 
     @GetMapping("/employee/{employeeId}")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('RRHH')")
+
     public ResponseEntity<List<DailyWorkSummary>> getEmployeeReport(
             @PathVariable Long employeeId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate start,
@@ -55,7 +55,7 @@ public class ReportingController {
     }
 
     @GetMapping("/me")
-    @PreAuthorize("hasRole('EMPLOYEE') or hasRole('ADMIN') or hasRole('RRHH')") // Asegura que el trabajador pueda verlo
+ // Asegura que el trabajador pueda verlo
     public ResponseEntity<List<DailyWorkSummary>> getMyReport(
         
             @AuthenticationPrincipal UserDetailsImpl userDetails, // Obtiene el ID del usuario logueado
@@ -65,11 +65,11 @@ public class ReportingController {
         Long employeeId = userDetails.getId();
 
         List<DailyWorkSummary> summary = reportingService.getEmployeeWorkSummary(employeeId, start, end);
-        return ResponseEntity.ok(summary);
+        return ResponseEntity.ok(summary);  
     }
 
     @GetMapping("/global/attendance")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('RRHH')")
+    
     public ResponseEntity<Resource> downloadGlobalAttendanceReport(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate start,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate end) {

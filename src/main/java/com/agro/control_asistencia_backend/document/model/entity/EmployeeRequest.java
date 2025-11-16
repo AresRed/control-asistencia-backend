@@ -40,5 +40,10 @@ private LocalDateTime requestedDate = LocalDateTime.now();
     private String status = "PENDING";
 
     // Comentario del manager/RRHH al responder la solicitud
+    // Comentario del manager/RRHH al responder la solicitud
     private String managerComment;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "manager_id") // Puede ser nulo si aún no se asigna un manager
+    private Employee manager;
 }

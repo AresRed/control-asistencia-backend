@@ -12,13 +12,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.agro.control_asistencia_backend.attendance.model.dto.AttendanceRequestDTO;
 import com.agro.control_asistencia_backend.attendance.model.dto.AttendanceResponseDTO;
+import com.agro.control_asistencia_backend.attendance.model.entity.AttendanceHistoryDTO;
 import com.agro.control_asistencia_backend.attendance.model.entity.AttendanceRecord;
 import com.agro.control_asistencia_backend.attendance.repository.AttendanceRepository;
 import com.agro.control_asistencia_backend.document.model.dto.EmployeeStatusDTO;
 import com.agro.control_asistencia_backend.employee.model.entity.Employee;
 import com.agro.control_asistencia_backend.employee.repository.EmployeeRepository;
-
-
 
 @Service
 public class AttendanceService {
@@ -98,7 +97,8 @@ public class AttendanceService {
             dto.setEmployeeId(employee.getId());
             dto.setEmployeeCode(employee.getEmployeeCode());
             dto.setFullName(employee.getFirstName() + " " + employee.getLastName());
-            dto.setPosition(employee.getPosition().getName());            dto.setBiometricHash(employee.getBiometricHash());
+            dto.setPosition(employee.getPosition().getName());
+            dto.setBiometricHash(employee.getBiometricHash());
             dto.setReportDate(date);
 
             if (lastRecord.isEmpty() || lastRecord.get().getDeviceTimestamp().toLocalDate().isBefore(date)) {
@@ -130,4 +130,32 @@ public class AttendanceService {
         return attendanceRepository.findByEmployee(employee);
     }
 
+    @Transactional(readOnly = true)
+    public List<AttendanceHistoryDTO> getAttendanceByUserId(Long userId) {
+
+        // 1. Encontrar el Empleado por su ID de Usuario (findByUserId debe existir en
+        // EmployeeRepository)
+        Employee employee = employeeRepository.findByUserId(userId)
+                .orElseThrow(() -> new RuntimeException("Perfil de Empleado no encontrado para el ID: " + userId));
+        List<AttendanceRecord> records = attendanceRepository.findByEmployee(employee);
+        return records.stream()
+                .map(this::mapToHistoryDTO)
+                .collect(Collectors.toList());
+    }
+
+    private AttendanceHistoryDTO mapToHistoryDTO(AttendanceRecord record) {
+        // ⚠️ CRÍTICO: El getEmployee() debe ocurrir DENTRO del método transaccional de
+        // llamada
+        // o la relación debe ser EAGER. Asumimos que está dentro de una transacción.
+        Employee employee = record.getEmployee();
+
+        return AttendanceHistoryDTO.builder()
+                .id(record.getId())
+                .employeeCode(employee.getEmployeeCode())
+                .recordType(record.getRecordType())
+                .deviceTimestamp(record.getDeviceTimestamp())
+                .syncTimestamp(record.getSyncTimestamp())
+                .position(employee.getPosition().getName()) // Obtener el nombre legible
+                .build();
+    }
 }

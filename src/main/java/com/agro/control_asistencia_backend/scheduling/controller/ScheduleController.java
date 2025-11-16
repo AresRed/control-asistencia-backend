@@ -66,11 +66,11 @@ public class ScheduleController {
         return ResponseEntity.ok(schedules);
     }
 
-    @GetMapping("/me/weekly")
-   
-    public ResponseEntity<ScheduleResponseDTO> getMyWeeklySchedule(
+    @GetMapping("/me")
+    @PreAuthorize("hasAnyAuthority('ROLE_USER', 'ROLE_ADMIN', 'ROLE_RRHH')")
+    public ResponseEntity<ScheduleResponseDTO> getMySchedule(
             @AuthenticationPrincipal UserDetailsImpl userDetails,
-            @RequestParam LocalDate date) { // Recibe la fecha de inicio de semana
+            @RequestParam LocalDate date) {
         
         // 1. Obtener el ID del empleado
         Long userId = userDetails.getId(); 

@@ -96,11 +96,13 @@ public class SecurityConfig {
 
                 // 3. Configuración de Autorización
                 .authorizeHttpRequests(auth -> auth
-                    
+                        .requestMatchers("/api/auth/**").permitAll()
+                        .requestMatchers("/api/employee/me", "/api/employee/managers").authenticated()
+                        .requestMatchers("/api/schedules/me").authenticated()
                         .requestMatchers("/api/employee/**").hasAnyRole("ADMIN", "RRHH")
-                    
-
-                        .anyRequest().permitAll());
+                        .requestMatchers("/api/schedules/**").hasAnyRole("ADMIN", "RRHH")
+                        .requestMatchers("/api/documents/**").permitAll()
+                        .anyRequest().authenticated());
 
         // 4. Agregar el filtro JWT (ya lo tienes correctamente)
         http.addFilterBefore(authenticationJwtTokenFilter, UsernamePasswordAuthenticationFilter.class);

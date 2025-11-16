@@ -84,7 +84,7 @@ public class DocumentService {
                 Document savedDoc = documentRepository.save(document);
 
                 // 5. Devolver DTO de Respuesta
-                return mapToDocumentResponseDTO(savedDoc);
+                return mapToDTO(savedDoc);
         }
 
         // ---------------------------------------------------------------------
@@ -100,17 +100,6 @@ public class DocumentService {
         // ---------------------------------------------------------------------
         // Auxiliares
         // ---------------------------------------------------------------------
-        private DocumentResponseDTO mapToDocumentResponseDTO(Document doc) {
-                return DocumentResponseDTO.builder()
-                                .id(doc.getId())
-                                .fileName(doc.getFileName())
-                                .documentType(doc.getDocumentType())
-                                .employeeCode(doc.getEmployee().getEmployeeCode())
-                                .uploadDate(doc.getUploadDate())
-                                .downloadUrl("/api/documents/" + doc.getId() + "/download") // URL para descargar
-                                .build();
-        }
-
         @Transactional
         public DocumentResponseDTO generateDocument(Long employeeId, Long templateId, UserDetailsImpl user)
                         throws IOException {
@@ -152,13 +141,13 @@ public class DocumentService {
                 Document savedDoc = documentRepository.save(document);
 
                 // 5. Devolver DTO de Respuesta
-                return mapToDocumentResponseDTO(savedDoc);
+                return mapToDTO(savedDoc);
         }
 
         public String generatePayslipPdf(Payslip payslip) {
 
                 DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMM");
-                String period = payslip.getPayPeriodStart().format(formatter);
+                String period = payslip.getPeriodStartDate().format(formatter);
 
                 String fileName = String.format("%d_%s_Boleta.pdf",
                                 payslip.getEmployee().getId(),
@@ -170,8 +159,9 @@ public class DocumentService {
 
         @Transactional(readOnly = true)
         public List<DocumentResponseDTO> getAllDocuments() {
-                return documentRepository.findAll().stream()
-                                .map(this::mapToDocumentResponseDTO)
+                List<Document> documents = documentRepository.findAll();
+                return documents.stream()
+                                .map(this::mapToDTO)
                                 .collect(Collectors.toList());
         }
 
@@ -185,23 +175,25 @@ public class DocumentService {
                 return documentRepository.findByEmployee(employee);
         }
 
-        private DocumentResponseDTO mapToResponseDTO(Document doc) {
-        
-                // Asumimos que la entidad Employee está cargada (EAGERLY o dentro de la transacción)
+        private DocumentResponseDTO mapToDTO(Document doc) {
+
                 Employee employee = doc.getEmployee();
-                
+
+                String empCode = (employee != null) ? employee.getEmployeeCode() : "N/A";
+                String empName = (employee != null) ? employee.getFirstName() + " " + employee.getLastName()
+                                : "No Asignado";
                 return DocumentResponseDTO.builder()
-                        .id(doc.getId())
-                        .fileName(doc.getFileName())
-                        .documentType(doc.getDocumentType())
-                        // 💡 Mapear el código y el nombre del empleado a partir de la relación
-                        .employeeCode(employee.getEmployeeCode())
-                        .employeeName(employee.getFirstName() + " " + employee.getLastName()) 
-                        .uploadDate(doc.getUploadDate())
-                        // Generar la URL de descarga basada en el ID
-                        .downloadUrl("/api/documents/" + doc.getId() + "/download") 
-                        .build();
-            }
+                                .id(doc.getId())
+                                .fileName(doc.getFileName())
+                                .documentType(doc.getDocumentType())
+                                .employeeCode(empCode)
+                                .employeeName(empName)
+                                .uploadedBy(doc.getUploadedBy())
+                                .uploadDate(doc.getUploadDate())
+                                .downloadUrl("/api/documents/" + doc.getId() + "/download")
+                                .build();
+        }
+
         @Transactional
         public DocumentResponseDTO createCertificateRecord(CertificateCreationDTO dto) {
 
@@ -218,10 +210,10 @@ public class DocumentService {
                 // ... otros setters
 
                 Document savedDoc = documentRepository.save(doc);
-                return mapToResponseDTO(savedDoc); // Devolver el DTO limpio
+                return mapToDTO(savedDoc); // Devolver el DTO limpio
         }
 
-        @Transactional (readOnly = true)
+        @Transactional(readOnly = true)
 
         public List<DocumentResponseDTO> getCertificatesByUserId(Long userId) {
                 Employee employee = employeeRepository.findByUserId(userId)
@@ -231,7 +223,15 @@ public class DocumentService {
                 return documentRepository.findByEmployee(employee).stream()
                                 .filter(d -> d.getDocumentType().toUpperCase().contains("CERTIFICADO")
                                                 || d.getDocumentType().toUpperCase().contains("DIPLOMA"))
-                                .map(this::mapToResponseDTO)
+                                .map(this::mapToDTO)
                                 .collect(Collectors.toList());
         }
+
+        @Transactional(readOnly = true)
+        public List<Document> getDocumentsByUserId(Long userId) {
+                Employee employee = employeeRepository.findByUserId(userId)
+                                .orElseThrow(() -> new RuntimeException("Perfil no encontrado."));
+                return documentRepository.findByEmployee(employee);
+        }
+        
 }

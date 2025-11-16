@@ -29,13 +29,12 @@ public class Payslip {
     @JoinColumn(name = "employee_id", nullable = false)
     private Employee employee;
 
-    private LocalDate payPeriodStart;
-    private LocalDate payPeriodEnd;
-    private Long totalRegularMinutes; 
-    private Long totalOvertimeMinutes; 
-    private BigDecimal regularPay;
-    private BigDecimal overtimePay;
-    private BigDecimal netSalary; 
-    private String documentPath;
-
+    private LocalDate periodStartDate;
+    private LocalDate periodEndDate;
+    private BigDecimal grossSalary;
+    private BigDecimal bonuses;
+    private BigDecimal deductions;
+    private BigDecimal netSalary;
+    private LocalDate generationDate;
+    private String filePath;
 }

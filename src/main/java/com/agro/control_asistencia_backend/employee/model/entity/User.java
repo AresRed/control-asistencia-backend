@@ -37,7 +37,7 @@ public class User {
     @JoinColumn(name = "role_id", nullable = false)
     private Role role;
 
-    @Column(name = "is_enabled", nullable = false)
+    @Column(name = "isEnabled", nullable = false)
     private boolean isEnabled = true;
 
 }
